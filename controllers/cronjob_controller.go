@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/batch/v1"
 	v12 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
 	"sort"
 	"time"
@@ -51,7 +52,8 @@ type Clock interface {
 // CronJobReconciler reconciles a CronJob object
 type CronJobReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 	Clock
 }
 
@@ -60,6 +62,7 @@ type CronJobReconciler struct {
 //+kubebuilder:rbac:groups=batch.tutorial.kubebuilder.io,resources=cronjobs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -352,6 +355,8 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// don't bother requeuing until we get a change to the spec
 		return scheduledResult, nil
 	}
+	r.Recorder.Event(&cronJob, v12.EventTypeNormal, "Job Creating", "A job has been created by the cronjob")
+	logger.V(1).Info("create a event", "job", job)
 
 	// 在 k8s 集群上启动一个 Job Resource
 	if err := r.Create(ctx, job); err != nil {
